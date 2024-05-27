@@ -115,7 +115,7 @@ class RPO_Detumble3DEnv(gym.Env):
             # action = [u_mag, thetea]
             # self.action = np.empty((2))  
             # self.action_space = spaces.Box(np.array([0,1]),np.array([-np.pi/4,np.pi/4]),dtype=np.float32)      
-
+            
             # self state space
             # s = [q, w, urem, uorb, t]
             ub = np.array([1,1,1,1, 200, 200, 200, urem_max, uorb_max, 10])
