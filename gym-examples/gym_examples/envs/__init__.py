@@ -1,1 +1,2 @@
 from gym_examples.envs.rpo_detumble2d import RPO_Detumble2DEnv
+from gym_examples.envs.rpo_detumble3d import RPO_Detumble3DEnv

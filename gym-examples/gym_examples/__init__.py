@@ -4,3 +4,8 @@ register(
     id="gym_examples/RPO_Detumble2DEnv-v0",
     entry_point="gym_examples.envs:RPO_Detumble2DEnv",
 )
+
+register(
+    id="gym_examples/RPO_Detumble3DEnv-v0",
+    entry_point="gym_examples.envs:RPO_Detumble3DEnv",
+)
