@@ -100,13 +100,18 @@ class RPO_Detumble3DEnv(gym.Env):
             # self.t   = data["t"]     # 1 x n_time
             self.rtn = data["rtn"]   # 6 x n_time
             self.qw_SC_RTN  = data["qw"]    # 7 x n_time
+            self.qw_SC_RTN = np.zeros(self.qw_SC_RTN.shape)
+            self.qw_SC_RTN[0,:] = 1
 
-            self.dt = 10  # sec
+            # self.dt = 10  # sec
             
             # target info
             self.oe0  = np.array([7000e3, 0.001, 0, 0, 0, 0])  # [m]
             self.oe   = self.oe0.copy()
-            self.J_targ = np.diag([100,100,100])
+            self.J_targ = np.array([[562.07457,   0.     ,   0.0],
+              [  0.     , 562.07465,   0.     ],
+              [  0.0,   0.     , 192.29662]])
+            
             self.n    = np.sqrt(398600e9/self.oe[0]**3)
             self.period = 2*np.pi/self.n
             
@@ -123,11 +128,14 @@ class RPO_Detumble3DEnv(gym.Env):
             self.action = np.empty((1))  
             # self.action_space = spaces.Box(np.array([0,1]),dtype=np.float64)      
 
-            self.w_max = 20
+            self.w_max = 0.1
             self.num_burn_max = 10
             self.urem_max = 10
             self.K_max = 200
             self.num_rev = 20
+            self.n_orbit = 100 # d_orbit
+            self.freq_thrust = 25 # time steps between thrusts
+
 
             ub = np.array([1,1,1,1, self.w_max, self.w_max, self.w_max, self.num_burn_max, self.urem_max, self.num_rev])#TODO figure out nondimensional time, #revolutions?
             lb = np.array([-1,-1,-1,-1,-self.w_max,-self.w_max,-self.w_max, 0, 0.0, 0.0])
@@ -139,7 +147,7 @@ class RPO_Detumble3DEnv(gym.Env):
             # self.umax = K_max*   # max output of the thrustr [unit?]
 
             # threshold of detumbling (TBD) rad/s
-            self.w_tol = 1e-1
+            self.w_tol = 1e-2
         
     # assuminng perfect observation as of now 
     def _get_obs(self):
@@ -164,25 +172,30 @@ class RPO_Detumble3DEnv(gym.Env):
         return self.state, {}
     
     
-    def step(self, action):
+    def step(self, action):        
         num_burn, u_rem, t = self.state[7:10]
+        t = int(t)%self.n_orbit
 
+        rtn_SC    = self.rtn[:,t]
+        self.d = la.norm(rtn_SC[0:3])
         qw_RSO_SC = self.state[0:7]
-        qw_SC_I   = self.qw_SC_RTN[4:7,self.t]
+        qw_SC_I   = self.qw_SC_RTN[:,t]
         q_RSO_I   = q_mul(q_conj(q_inv(qw_SC_I[0:4])),qw_RSO_SC[0:4])
-        w_RSO_I   = q2rotmat(qw_SC_I[0:4]).T@qw_RSO_SC[4:7]
+        w_RSO_I   = q2rotmat(qw_SC_I[0:4]).T@qw_RSO_SC[4:7]        
+        
+        h_I = self.J_targ @ w_RSO_I
+        
+        T_I = a2t_laser_3D(action, h_I, self.d)
+        dw_RSO_I  = T_I#la.inv(self.J_targ)@T_I
+        w_RSO_I   = w_RSO_I + dw_RSO_I
         qw_RSO_I  = np.hstack((q_RSO_I, w_RSO_I))
-        
-        
-        h_I = self.J_targ @ qw_RSO_I[4:7]
-        
-        T_I = a2t_laser_3D(action, h_I) 
 
-        qw_RSO_I   = odeint(ode_qw, qw_RSO_I, [0, self.period/2], args=(self.J_targ, T_I))[1]
-        qw_SC_I    = self.qw_SC_RTN[:,t+1]        
+
+        qw_RSO_I   = odeint(ode_qw, qw_RSO_I, [0, self.period/self.n_orbit*self.freq_thrust], args=(self.J_targ, np.zeros(T_I.shape)))[1]
+        qw_SC_I    = self.qw_SC_RTN[:,t+1]     
         q_RSO_SC   = q_mul(q_conj(qw_SC_I[0:4]),qw_RSO_I[0:4])
         w_RSO_SC   = q2rotmat(qw_SC_I[0:4])@qw_RSO_I[4:7]
-        self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+1))   # only update angular velocity now... 
+        self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+self.freq_thrust))   # only update angular velocity now... 
         
         
         reward = (-action - la.norm(self.state[4:7]) - t)#TODO: weight this sum
@@ -194,14 +207,14 @@ class RPO_Detumble3DEnv(gym.Env):
         
         info = {}
         
-        return self.state, reward, terminated, False, info
+        return self.state, reward, terminated, False, info, T_I
 
-def a2t_laser_3D(a, hrel):
-    u_mag = a
+def a2t_laser_3D(a, hrel,d):
+    u_mag = a/d**2
     hrel_norm = la.norm(hrel)
 
-    torque = u_mag * hrel / hrel_norm
-    return torque
+    control_input = - u_mag * hrel / hrel_norm
+    return control_input
 
 
 def a2t_laser_2d(a, d, r):
@@ -245,8 +258,7 @@ def q_kin(q, omega):
     return 0.5 * q_mul(q, np.array([0, omega[0], omega[1], omega[2]]))
 
 def euler_dyn(w, I, tau):
-    # return la.inv(I).dot(tau - np.cross(w, I.dot(w)))
-    return (tau - w * I * w) / I
+    return la.inv(I).dot(tau - np.cross(w, I.dot(w)))
 
 ### Quaternion setup 
 # q = [q0, q1, q2, q3] = [scalar, vector]
