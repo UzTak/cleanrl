@@ -135,7 +135,7 @@ class RPO_Detumble3DEnv(gym.Env):
         
         info = {}
         
-        return self.state, reward, terminated, False, info, T_I
+        return self.state, reward, terminated, False, info, #T_I 
 
 def a2t_laser_3D(a, hrel,d):
     u_mag = a/d**2
