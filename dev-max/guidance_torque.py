@@ -96,8 +96,11 @@ class RPO_Detumble2DEnv(gym.Env):
 class RPO_Detumble3DEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     def __init__(self, render_mode=None, size=5):
-            
-            self.t = 0  
+            data = np.load("/home/cyrus/cleanrl/dev-max/traj_data.npy",allow_pickle=True).item()
+            # self.t   = data["t"]     # 1 x n_time
+            self.rtn = data["rtn"]   # 6 x n_time
+            self.qw_SC_RTN  = data["qw"]    # 7 x n_time
+
             self.dt = 10  # sec
             
             # target info
@@ -105,24 +108,32 @@ class RPO_Detumble3DEnv(gym.Env):
             self.oe   = self.oe0.copy()
             self.J_targ = np.diag([100,100,100])
             self.n    = np.sqrt(398600e9/self.oe[0]**3)
+            self.period = 2*np.pi/self.n
             
+            #TODO: add the relative position of the target
             self.d = 10 # distance between the target and the satellite (currently constant)
+            #TODO: add the relative position of the target
             self.r = 1  # radius of the target 
             
-            # state = [q, w, ROE]
-            self.state = np.zeros((13))
+
+            # state = [q_rel, w_rel, num_burn, u_rem, t]
+            self.state = np.zeros((10))
             
-            # action = [u_mag, thetea]
-            # self.action = np.empty((2))  
-            # self.action_space = spaces.Box(np.array([0,1]),np.array([-np.pi/4,np.pi/4]),dtype=np.float32)      
-            
-            # self state space
-            # s = [q, w, urem, uorb, t]
-            ub = np.array([1,1,1,1, 200, 200, 200, urem_max, uorb_max, 10])
-            lb = np.array([-1,-1,-1,-1,-200,-200,-200,0,0,0])
-            # high = np.array([1,1,1,1, 1,1,1, 200, 200, 200, 200, 200, 200])
+            # action = [u_mag]
+            self.action = np.empty((1))  
+            # self.action_space = spaces.Box(np.array([0,1]),dtype=np.float64)      
+
+            self.w_max = 20
+            self.num_burn_max = 10
+            self.urem_max = 10
+            self.K_max = 200
+            self.num_rev = 20
+
+            ub = np.array([1,1,1,1, self.w_max, self.w_max, self.w_max, self.num_burn_max, self.urem_max, self.num_rev])#TODO figure out nondimensional time, #revolutions?
+            lb = np.array([-1,-1,-1,-1,-self.w_max,-self.w_max,-self.w_max, 0, 0.0, 0.0])
+        
             self.observation_space = spaces.Box(lb, ub, dtype=np.float64)
-            high = K_max #np.array([K_max])
+            high = self.K_max #np.array([K_max])
             low = 0.0 #np.array([0])
             self.action_space = spaces.Box(low, high, dtype = np.float64)
             # self.umax = K_max*   # max output of the thrustr [unit?]
@@ -143,7 +154,10 @@ class RPO_Detumble3DEnv(gym.Env):
             np.random.seed(seed)
 
         # Reset environment state
-        self.state = np.zeros((13))
+        q_res = np.random.rand(4)
+        q_res = q_res/la.norm(q_res)
+        w_res = np.random.rand(3)*self.w_max
+        self.state = np.hstack((q_res, w_res, 0, 1.0, 0))
 
         # Return initial observation
         # return self._get_obs
@@ -151,21 +165,29 @@ class RPO_Detumble3DEnv(gym.Env):
     
     
     def step(self, action):
+        num_burn, u_rem, t = self.state[7:10]
 
-        qw = self.state[0:7]        
-        hrel = self.J_targ @ self.state[4:7]
-        T = a2t_laser_3D(action, hrel) 
-        # J = 1e-3
-        # qw = odeint(ode_qw, qw, [0, self.dt], args=(T,))[1]
-        qw = odeint(ode_qw, qw, [0, self.dt], args=(self.J_targ, T))[1]
-        self.state[3:6] = qw[4:7]   # only update angular velocity now... 
+        qw_RSO_SC = self.state[0:7]
+        qw_SC_I   = self.qw_SC_RTN[4:7,self.t]
+        q_RSO_I   = q_mul(q_conj(q_inv(qw_SC_I[0:4])),qw_RSO_SC[0:4])
+        w_RSO_I   = q2rotmat(qw_SC_I[0:4]).T@qw_RSO_SC[4:7]
+        qw_RSO_I  = np.hstack((q_RSO_I, w_RSO_I))
         
-        self.t += self.dt 
-        self.oe += np.array([0,0,0,0,0,self.n*self.dt])
         
-        reward = -action[0]
+        h_I = self.J_targ @ qw_RSO_I[4:7]
         
-        if (abs(self.state[3:6]) < self.w_tol).all():
+        T_I = a2t_laser_3D(action, h_I) 
+
+        qw_RSO_I   = odeint(ode_qw, qw_RSO_I, [0, self.period/2], args=(self.J_targ, T_I))[1]
+        qw_SC_I    = self.qw_SC_RTN[:,t+1]        
+        q_RSO_SC   = q_mul(q_conj(qw_SC_I[0:4]),qw_RSO_I[0:4])
+        w_RSO_SC   = q2rotmat(qw_SC_I[0:4])@qw_RSO_I[4:7]
+        self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+1))   # only update angular velocity now... 
+        
+        
+        reward = (-action - la.norm(self.state[4:7]) - t)#TODO: weight this sum
+        
+        if (abs(self.state[4:7]) < self.w_tol).all():
             terminated = True
         else:
             terminated = False    
@@ -236,3 +258,18 @@ def q_mul(q0, q1):
         q0[0]*q1[2] - q0[1]*q1[3] + q0[2]*q1[0] + q0[3]*q1[1],
         q0[0]*q1[3] + q0[1]*q1[2] - q0[2]*q1[1] + q0[3]*q1[0]
     ])   
+
+def q_conj(q):
+    return np.array([q[0], -q[1], -q[2], -q[3]])
+
+def q_inv(q):
+    return q_conj(q) / la.norm(q)
+
+def q2rotmat(q):
+    # Convert quaternion to rotation matrix
+    q0, q1, q2, q3 = q
+    return np.array([
+        [1 - 2*q2**2 - 2*q3**2, 2*q1*q2 - 2*q0*q3,     2*q1*q3 + 2*q0*q2],
+        [2*q1*q2 + 2*q0*q3,     1 - 2*q1**2 - 2*q3**2, 2*q2*q3 - 2*q0*q1],
+        [2*q1*q3 - 2*q0*q2,     2*q2*q3 + 2*q0*q1,     1 - 2*q1**2 - 2*q2**2]
+    ])
