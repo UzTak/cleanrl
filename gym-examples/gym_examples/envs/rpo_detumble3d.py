@@ -94,7 +94,7 @@ class RPO_Detumble3DEnv(gym.Env):
         q_res = np.random.rand(4)
         q_res = q_res/la.norm(q_res)
         w_res = np.random.rand(3)*self.w_max
-        self.state = np.hstack((q_res, w_res, 0, 1.0, 0))
+        self.state = np.hstack((q_res, w_res, 0, 10.0, 0))
 
         # Return initial observation
         # return self._get_obs
@@ -127,9 +127,9 @@ class RPO_Detumble3DEnv(gym.Env):
         self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+self.freq_thrust))   # only update angular velocity now... 
         
         
-        reward = float(-action - la.norm(self.state[4:7]) - t)#TODO: weight this sum
+        reward = (-action - la.norm(self.state[4:7]) - t).item()   #TODO: weight this sum
         
-        if (abs(self.state[4:7]) < self.w_tol).all():
+        if (abs(self.state[4:7]) < self.w_tol).all() or u_rem-action < 1e-2:
             terminated = True
         else:
             terminated = False    

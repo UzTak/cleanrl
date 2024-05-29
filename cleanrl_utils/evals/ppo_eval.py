@@ -21,18 +21,24 @@ def evaluate(
     agent.load_state_dict(torch.load(model_path, map_location=device))
     agent.eval()
 
-    obs, _ = envs.reset()
     episodic_returns = []
     while len(episodic_returns) < eval_episodes:
-        actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
-        next_obs, _, _, _, infos = envs.step(actions.cpu().numpy())
-        if "final_info" in infos:
-            for info in infos["final_info"]:
-                if "episode" not in info:
-                    continue
-                print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-                episodic_returns += [info["episode"]["r"]]
-        obs = next_obs
+        obs, _ = envs.reset()
+        r = 0 
+        while True:
+            actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
+            next_obs, reward, terminated, _, infos = envs.step(actions.cpu().numpy())
+            # if "final_info" in infos:
+            #     for info in infos["final_info"]:
+            #         if "episode" not in info:
+            #             continue
+            #         print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
+            #         episodic_returns += [info["episode"]["r"]]
+            r += reward.item() 
+            obs = next_obs
+            if terminated:
+                break
+        episodic_returns.append(r)
 
     return episodic_returns
 
