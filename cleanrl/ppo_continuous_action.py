@@ -34,9 +34,9 @@ class Args:
     """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
-    save_model: bool = False
+    save_model: bool = True
     """whether to save model into the `runs/{run_name}` folder"""
-    upload_model: bool = False
+    upload_model: bool = True
     """whether to upload the saved model to huggingface"""
     hf_entity: str = ""
     """the user or org name of the model repository from the Hugging Face Hub"""
@@ -91,8 +91,8 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
         if capture_video and idx == 0:
             # env = gym.make(env_id, render_mode="rgb_array")
-            env = gym.make('gym_examples/RPO_Detumble2DEnv-v0', render_mode="rgb_array")
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
+            env = gym.make('gym_examples/RPO_Detumble3DEnv-v0')  #, render_mode="rgb_array")
+            # env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         else:
             # env = gym.make(env_id)
             # env = gym.make('gym_examples/RPO_Detumble2DEnv-v0')

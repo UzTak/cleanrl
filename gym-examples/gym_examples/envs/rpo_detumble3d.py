@@ -11,7 +11,8 @@ import numpy as np
 import numpy.linalg as la
 from scipy.integrate import odeint
 
-import gymnasium as gym
+# import gymnasium as gym
+import gym 
 from gym import spaces
 
 import os 
@@ -126,7 +127,7 @@ class RPO_Detumble3DEnv(gym.Env):
         self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+self.freq_thrust))   # only update angular velocity now... 
         
         
-        reward = (-action - la.norm(self.state[4:7]) - t)#TODO: weight this sum
+        reward = float(-action - la.norm(self.state[4:7]) - t)#TODO: weight this sum
         
         if (abs(self.state[4:7]) < self.w_tol).all():
             terminated = True
