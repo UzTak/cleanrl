@@ -16,12 +16,16 @@ from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 
 import sys
+# sys.path.append('/home/cyrus/aa203_cleanrl')
+# root_dir = '/home/cyrus/aa203_cleanrl'
 sys.path.append('C:/Users/yujit/github/cleanrl')
 root_dir = 'C:/Users/yujit/github/cleanrl'
 
-from cleanrl.ppo_continuous_action import * 
-from cleanrl_utils.evals.ppo_eval import *
-from plot_misc import * 
+from plot_misc import plot_sol_qw, plot_input
+import matplotlib.pyplot as plt
+
+from ppo_continuous_action import * 
+from ppo_eval import *
 
 
 if __name__ == "__main__":
@@ -51,37 +55,25 @@ if __name__ == "__main__":
     
     print(f"loading a trained model from {model_path}...")
 
-    eval_episodes = 10
-
-    # episodic_returns, obs_history = evaluate(
-    #     model_path,
-    #     make_env,
-    #     args.env_id,
-    #     eval_episodes=eval_episodes,
-    #     run_name=f"{run_name}-eval",
-    #     Model=Agent,
-    #     device=device,
-    #     gamma=args.gamma,
-    # )
-    
-    episodic_returns, obs_history = evaluate_dummy(
+    episodic_returns, all_obs, all_actions = evaluate_dummy(
         model_path,
         make_env,
         args.env_id,
-        eval_episodes=eval_episodes,
+        eval_episodes=10,
         run_name=f"{run_name}-eval",
         Model=Agent,
         device=device,
         gamma=args.gamma,
     )
     
-    fig = plt.figure()
-    color_list = get_color_list('viridis', eval_episodes)
-    
-    for i in range(eval_episodes):
-        fig = plot_sol_qw2(fig, obs_history[i][:, :7].T, None, range(np.shape(obs_history[i])[0]), None, c=color_list[i])
-    
     print(episodic_returns)
-    print("done")
-    plt.tight_layout()
+
+    J_targ = np.array([[562.07457,   0.     ,   0.0],
+              [  0.     , 562.07465,   0.     ],
+              [  0.0,   0.     , 192.29662]])
+    for i in range(1):#range(len(all_obs)):
+        plot_sol_qw(all_obs[i][:,0:7].T, range(len(all_obs[i][:,0:7])), J_targ)
+
+        # plot_input(all_actions[i].T,range(len(all_actions[i])))
     plt.show()
+    print("done")

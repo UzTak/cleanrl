@@ -26,6 +26,7 @@ class RPO_Detumble3DEnv(gym.Env):
     def __init__(self, render_mode=None, size=5):
             file_path = os.path.join(current_dir, 'traj_data.npy')
             data = np.load(file_path,allow_pickle=True).item()
+            print("data loaded")
             # self.t   = data["t"]     # 1 x n_time
             self.rtn = data["rtn"]   # 6 x n_time
             self.qw_SC_RTN  = data["qw"]    # 7 x n_time
@@ -49,7 +50,6 @@ class RPO_Detumble3DEnv(gym.Env):
             #TODO: add the relative position of the target
             self.r = 1  # radius of the target 
             
-
             # state = [q_rel, w_rel, num_burn, u_rem, t]
             self.state = np.zeros((10))
             
@@ -94,7 +94,7 @@ class RPO_Detumble3DEnv(gym.Env):
         q_res = np.random.rand(4)
         q_res = q_res/la.norm(q_res)
         w_res = np.random.rand(3)*self.w_max
-        self.state = np.concatenate((q_res, w_res, np.array([0, 10.0, 0])))
+        self.state = np.hstack((q_res, w_res, 0, 10.0, 0))
 
         # Return initial observation
         # return self._get_obs
@@ -118,29 +118,34 @@ class RPO_Detumble3DEnv(gym.Env):
         dw_RSO_I  = T_I#la.inv(self.J_targ)@T_I
         w_RSO_I   = w_RSO_I + dw_RSO_I
         qw_RSO_I  = np.hstack((q_RSO_I, w_RSO_I))
-
-
+        
         qw_RSO_I   = odeint(ode_qw, qw_RSO_I, [0, self.period/self.n_orbit*self.freq_thrust], args=(self.J_targ, np.zeros(T_I.shape)))[1]
+        
         qw_SC_I    = self.qw_SC_RTN[:,t+1]     
         q_RSO_SC   = q_mul(q_conj(qw_SC_I[0:4]),qw_RSO_I[0:4])
         w_RSO_SC   = q2rotmat(qw_SC_I[0:4])@qw_RSO_I[4:7]
         self.state = np.hstack((q_RSO_SC,w_RSO_SC, num_burn+1, u_rem-action, t+self.freq_thrust))   # only update angular velocity now... 
         
-
-                    
+        if abs(np.linalg.norm(q_RSO_SC) - 1) > 0.1:
+            print("aaaaa")
+            
+        print("norm q_RSO_SC: ", np.linalg.norm(q_RSO_SC))
+        
+        
         reward = (-action - la.norm(self.state[4:7]) - t).item()   #TODO: weight this sum
         
-        if (abs(self.state[4:7]) < self.w_tol).all() or u_rem-action < 1e-2:
+        if (abs(self.state[4:7]) < self.w_tol).all() or u_rem-action < 1e-2 or num_burn > self.num_burn_max:
+            if (abs(self.state[4:7]) > self.w_tol).all():
+                reward = -1000
             terminated = True
         else:
             terminated = False    
         
-        info = {}
-        
-        return self.state, reward, terminated, False, info, #T_I 
+        info = {"T_I": T_I, "burns": num_burn, "u_rem": u_rem}
+        return self.state, reward, terminated, False, info
 
 def a2t_laser_3D(a, hrel,d):
-    u_mag = a/d**2
+    u_mag = a/(d**2)
     hrel_norm = la.norm(hrel)
 
     control_input = - u_mag * hrel / hrel_norm

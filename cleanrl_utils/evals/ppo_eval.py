@@ -3,6 +3,7 @@ from typing import Callable
 # import gymnasium as gym
 import gym 
 import torch
+import numpy as np 
 
 
 def evaluate(
@@ -41,6 +42,78 @@ def evaluate(
         episodic_returns.append(r)
 
     return episodic_returns
+
+
+
+def evaluate_dummy(
+    model_path: str,
+    make_env: Callable,
+    env_id: str,
+    eval_episodes: int,
+    run_name: str,
+    Model: torch.nn.Module,
+    device: torch.device = torch.device("cpu"),
+    capture_video: bool = True,
+    gamma: float = 0.99,
+):
+    
+    """
+    Return: 
+       episodic_returns: (eval_episodes, )
+       obs_history: (eval_episodes, 20, 10)
+    """
+    
+    envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, capture_video, run_name, gamma)])
+    
+    episodic_returns = []
+    
+    obs_history = np.zeros((eval_episodes, 20, 10))   
+    
+    for i in range(eval_episodes):
+        
+        obs, _ = envs.reset()
+        
+        def reset(seed=None, options=None):
+            w_max = 1
+            # Set the seed if provided
+            if seed is not None:
+                np.random.seed(seed)
+            # Reset environment state
+            q_res = np.random.rand(4)
+            q_res = q_res/np.linalg.norm(q_res)
+            w_res = np.random.rand(3)*w_max
+            state = np.concatenate((q_res, w_res, np.array([0, 10.0, 0])))
+            return state, {}
+        
+        obs, _ = reset()
+
+        obs_history[i, 0] = obs
+        
+        r = 0 
+        j = 0    # index 
+        while True:
+            actions, = torch.tensor([[1.0]])
+            next_obs, reward, terminated, _, infos = envs.step(actions.cpu().numpy())
+            # if "final_info" in infos:
+            #     for info in infos["final_info"]:
+            #         if "episode" not in info:
+            #             continue
+            #         print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
+            #         episodic_returns += [info["episode"]["r"]]
+            r += reward.item() 
+            obs = next_obs
+            
+            obs_history[i, j] = obs
+            
+            if terminated:
+                break
+            
+            j += 1
+            
+        episodic_returns.append(r)
+
+    return episodic_returns, obs_history
+
 
 
 if __name__ == "__main__":
