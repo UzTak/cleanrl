@@ -73,21 +73,24 @@ def evaluate_dummy(
         
         obs, _ = envs.reset()
         
-        def reset(seed=None, options=None):
-            w_max = 1
-            # Set the seed if provided
-            if seed is not None:
-                np.random.seed(seed)
-            # Reset environment state
-            q_res = np.random.rand(4)
-            q_res = q_res/np.linalg.norm(q_res)
-            w_res = np.random.rand(3)*w_max
-            state = np.concatenate((q_res, w_res, np.array([0, 10.0, 0])))
-            return state, {}
-        
-        obs, _ = reset()
+        # def reset(seed=None, options=None):
+        #     w_max = 1
+        #     # Set the seed if provided
+        #     if seed is not None:
+        #         np.random.seed(seed)
+        #     # Reset environment state
+        #     q_res = np.random.rand(4)
+        #     q_res = q_res/np.linalg.norm(q_res)
+        #     w_res = np.random.rand(3)*w_max
+        #     state = np.concatenate((q_res, w_res, np.array([0, 10.0, 0])))
+        #     return state, {}
+        # obs, _ = reset()
 
         obs_history[i, 0] = obs
+        
+        # check the rms
+        print(envs.obs_rms.mean)
+        print(envs.obs_rms.var)
         
         r = 0 
         j = 0    # index 

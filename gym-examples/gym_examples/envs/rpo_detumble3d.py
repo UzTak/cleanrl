@@ -65,7 +65,6 @@ class RPO_Detumble3DEnv(gym.Env):
             self.n_orbit = 100 # d_orbit
             self.freq_thrust = 25 # time steps between thrusts
 
-
             ub = np.array([1,1,1,1, self.w_max, self.w_max, self.w_max, self.num_burn_max, self.urem_max, self.num_rev])#TODO figure out nondimensional time, #revolutions?
             lb = np.array([-1,-1,-1,-1,-self.w_max,-self.w_max,-self.w_max, 0, 0.0, 0.0])
         
