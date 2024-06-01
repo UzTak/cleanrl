@@ -132,3 +132,5 @@ venv.bak/
 
 # Your virtual environment
 cleanrl_venv/
+
+gym-examples/
