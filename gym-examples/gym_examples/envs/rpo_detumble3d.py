@@ -51,29 +51,25 @@ class RPO_Detumble3DEnv(gym.Env):
 
             alpha = 0.7
             
-            # state = [q_rel, w_rel, num_burn, u_rem, t]
-            self.state = np.zeros((10))
-            
-            # action = [u_mag]
-            self.action = np.empty((1))  
-            # self.action_space = spaces.Box(np.array([0,1]),dtype=np.float64)      
-
             self.n_orbit = 100 # d_orbit
             self.w_max = 0.1
-            self.num_burn_max = 100
-            self.K_max = 3.0
+            self.num_burn_max = 50
+            self.K_max = 4.0
             self.freq_thrust = 10 # time steps between thrusts
             self.urem_max = alpha*self.K_max*self.num_burn_max
             self.t_max = self.num_burn_max*self.freq_thrust
-
+            
             eps = 1e-3
             ub = np.array([ 1+eps, 1+eps, 1+eps, 1+eps, self.w_max, self.w_max, self.w_max, 1, 1, 1])
             lb = np.array([-1-eps,-1-eps,-1-eps,-1-eps,-self.w_max,-self.w_max,-self.w_max, 0.0, 0.0, 0.0])
-        
+            
+            # state = [q_rel, w_rel, num_burn, u_rem, t]
+            self.state = np.zeros((10))
             self.observation_space = spaces.Box(lb, ub, dtype=np.float64)
-            high = self.K_max #np.array([K_max])
-            low = 0.0 #np.array([0])
-            self.action_space = spaces.Box(low, high, dtype = np.float64)
+
+            # action = [u_mag]
+            self.action = np.zeros((1))  
+            self.action_space = spaces.Box(low=0, high=self.K_max, shape=(1,), dtype = np.float64)
 
             # threshold of detumbling (TBD) rad/s
             self.w_tol = 1e-2
@@ -93,7 +89,7 @@ class RPO_Detumble3DEnv(gym.Env):
         # Reset environment state
         q_res = np.random.rand(4)
         q_res = q_res/la.norm(q_res)
-        w_res = np.random.rand(3)*self.w_max
+        w_res = np.random.rand(3)*self.w_max/2
         self.state = np.concatenate((q_res, w_res, np.array([0, 1, 0])))
 
         # Return initial observation
@@ -108,6 +104,8 @@ class RPO_Detumble3DEnv(gym.Env):
         return control_input
     
     def step(self, action):
+        
+        action = np.clip(action, self.action_space.low, self.action_space.high)
         num_burn, u_rem, t = self.state[7:10] * np.array([self.num_burn_max, self.urem_max, self.t_max])
 
         # num_burn = int(num_burn)
@@ -131,22 +129,25 @@ class RPO_Detumble3DEnv(gym.Env):
         qw_SC_I    = self.qw_SC_RTN[:,t_res+1]     
         q_RSO_SC   = q_mul(q_conj(qw_SC_I[0:4]),qw_RSO_I[0:4])
         w_RSO_SC   = q2rotmat(qw_SC_I[0:4])@qw_RSO_I[4:7]
-        self.state = np.hstack((q_RSO_SC,w_RSO_SC, (num_burn+1)/self.num_burn_max, (u_rem-action)/self.urem_max, (t+self.freq_thrust)/self.t_max))  # only update angular velocity now... 
-                    
+        self.state = np.hstack((q_RSO_SC,w_RSO_SC, min((num_burn+1)/self.num_burn_max,1), max((u_rem-action)/self.urem_max,0), min((t+self.freq_thrust)/self.t_max,1)))  # only update angular velocity now... 
+        # print(self.state)
+        
         weights = np.array([-3, -10, -1])
+        weights = weights/abs(weights).sum()    # normalize weights
         reward = (weights[0]*action + weights[1]*la.norm(self.state[4:7]) + weights[2]*self.state[7]).item()   #TODO: weight this sum
         
         # if (abs(self.state[4:7]) < self.w_tol).all() or self.state[8] < 1e-2 or self.state[7] > 0.99:
         if (self.state[8] < 1e-2) and (abs(self.state[4:7]) > self.w_tol).all():
-            print("Detumbling failed (ran out of fuel)")
+            # print("Detumbling failed (ran out of fuel)")
             reward = -10
             terminated = True
         elif (self.state[7] > 0.99) and (abs(self.state[4:7]) > self.w_tol).all():
-            print("Detumbling failed (Exceeded number of burns)")
+            # print("Detumbling failed (Exceeded number of burns)")
             reward = -10
             terminated = True
         elif (abs(self.state[4:7]) < self.w_tol).all():
-            print("Detumbling successful")
+            # print("Detumbling successful")
+            # reward += 5
             # reward = 10
             terminated = True
         else:
