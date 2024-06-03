@@ -29,8 +29,6 @@ class RPO_Detumble3DEnv(gym.Env):
             self.qw_SC_RTN  = data["qw"]    # 7 x n_time
             self.qw_SC_RTN = np.zeros(self.qw_SC_RTN.shape)
             self.qw_SC_RTN[0,:] = 1
-
-            # self.dt = 10  # sec
             
             # target info
             self.oe0  = np.array([7000e3, 0.001, 0, 0, 0, 0])  # [m]
@@ -46,16 +44,15 @@ class RPO_Detumble3DEnv(gym.Env):
             self.d = 10 # distance between the target and the satellite (currently constant)
             #TODO: add the relative position of the target
             self.r = 1  # radius of the target 
-
             alpha = 0.7
             
             self.n_orbit = 100 # d_orbit
             self.w_max = 0.5
             self.num_burn_max = 50
-            self.K_max = 4.0
+            self.K_max = 3.0
             self.freq_thrust = 10 # time steps between thrusts
             self.urem_max = alpha*self.K_max*self.num_burn_max
-            self.t_max = self.num_burn_max*self.freq_thrust
+            self.t_max    = self.num_burn_max*self.freq_thrust
             
             eps = 1e-3
             ub = np.array([ 1+eps, 1+eps, 1+eps, 1+eps, self.w_max, self.w_max, self.w_max, 1, 1, 1])
@@ -87,7 +84,7 @@ class RPO_Detumble3DEnv(gym.Env):
         # Reset environment state
         q_res = np.random.rand(4)
         q_res = q_res/la.norm(q_res)
-        w_res = (2 * np.random.rand(3) - 1) * self.w_max * 0.75 
+        w_res = (2 * np.random.rand(3) - 1) * self.w_max * 0.5 
         self.state = np.concatenate((q_res, w_res, np.array([0, 1, 0])))
 
         # Return initial observation
@@ -132,7 +129,8 @@ class RPO_Detumble3DEnv(gym.Env):
         
         weights = np.array([-3, -10, -1])
         weights = weights/abs(weights).sum()    # normalize weights
-        reward = (weights[0]*action + weights[1]*la.norm(self.state[4:7]) + weights[2]*self.state[7]).item()   #TODO: weight this sum
+        H = np.linalg.norm(self.J_targ @ w_RSO_SC)   
+        reward = (weights[0]*action + weights[1]*H/100 + weights[2]*self.state[7]).item()   
         
         # if (abs(self.state[4:7]) < self.w_tol).all() or self.state[8] < 1e-2 or self.state[7] > 0.99:
         if (self.state[8] < 1e-2) and (abs(self.state[4:7]) > self.w_tol).all():

@@ -90,7 +90,7 @@ def evaluate_dummy(
             if use_NN:
                 actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
             else:
-                actions, = torch.tensor([[[1.0]]]) * envs.envs[0].K_max
+                actions, = torch.tensor([[[1.0]]]) * envs.envs[0].K_max * np.random.rand()  
                 
             actions = np.clip(actions, envs.envs[0].action_space.low, envs.envs[0].action_space.high)
             next_obs, reward, terminated, _, infos = envs.step(actions.cpu().numpy())

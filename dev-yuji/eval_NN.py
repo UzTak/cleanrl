@@ -61,7 +61,7 @@ if __name__ == "__main__":
         Model=Agent,
         device=device,
         gamma=args.gamma,
-        use_NN=True,
+        use_NN=False,
         seed_vec=np.arange(0, eval_episodes)
     )
     

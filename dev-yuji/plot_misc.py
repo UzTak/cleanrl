@@ -122,7 +122,7 @@ def plot_sol_qw(fig, qw, a, t, J, c="g"):
             if a is not None:
                 plt.scatter(t[:-1], a, color=c, s=2)
 
-        plt.xlabel('time [s]')
+        plt.xlabel('timestep [-]')
 
         if j == 0:
             plt.ylabel('$w_1$')
