@@ -19,8 +19,6 @@ import os
 import sys 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-
-
 class RPO_Detumble3DEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     def __init__(self, render_mode=None, size=5):
@@ -52,7 +50,7 @@ class RPO_Detumble3DEnv(gym.Env):
             alpha = 0.7
             
             self.n_orbit = 100 # d_orbit
-            self.w_max = 0.1
+            self.w_max = 0.5
             self.num_burn_max = 50
             self.K_max = 4.0
             self.freq_thrust = 10 # time steps between thrusts
@@ -89,7 +87,7 @@ class RPO_Detumble3DEnv(gym.Env):
         # Reset environment state
         q_res = np.random.rand(4)
         q_res = q_res/la.norm(q_res)
-        w_res = np.random.rand(3)*self.w_max/2
+        w_res = (2 * np.random.rand(3) - 1) * self.w_max * 0.75 
         self.state = np.concatenate((q_res, w_res, np.array([0, 1, 0])))
 
         # Return initial observation

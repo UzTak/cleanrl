@@ -31,7 +31,7 @@ if __name__ == "__main__":
     args.num_iterations = args.total_timesteps // args.batch_size
     
     # your pretrained model path 
-    run_name = "RPO_Detumble3DEnv-v0"
+    run_name = "RPO_Detumble2DEnv-v0__ppo_continuous_action__1__1717398428"
     model_path = root_dir + f"/runs/gym_examples/{run_name}/ppo_continuous_action.cleanrl_model"
 
     # TRY NOT TO MODIFY: seeding
@@ -51,20 +51,8 @@ if __name__ == "__main__":
     
     print(f"loading a trained model from {model_path}...")
 
-    eval_episodes = 10
-
-    # episodic_returns, obs_history = evaluate(
-    #     model_path,
-    #     make_env,
-    #     args.env_id,
-    #     eval_episodes=eval_episodes,
-    #     run_name=f"{run_name}-eval",
-    #     Model=Agent,
-    #     device=device,
-    #     gamma=args.gamma,
-    # )
-    
-    episodic_returns, obs_history = evaluate_dummy(
+    eval_episodes = 5
+    episodic_returns, obs_history, actions, tf, utot = evaluate_dummy(
         model_path,
         make_env,
         args.env_id,
@@ -73,15 +61,32 @@ if __name__ == "__main__":
         Model=Agent,
         device=device,
         gamma=args.gamma,
+        use_NN=True,
+        seed_vec=np.arange(0, eval_episodes)
     )
     
-    fig = plt.figure()
+    print(f"tf: {tf}")
+    print(f"utot: {np.round(utot,2)}")
+    
+    fig = plt.figure(figsize=(10, 6))
     color_list = get_color_list('viridis', eval_episodes)
     
-    for i in range(eval_episodes):
-        fig = plot_sol_qw2(fig, obs_history[i][:, :7].T, None, range(np.shape(obs_history[i])[0]), None, c=color_list[i])
+    tf_max = int(np.max(tf)) 
     
-    print(episodic_returns)
+    # moment of inertia (RSO, body frame)
+    J = np.array([[562.07457,   0.     ,   0.0],
+              [  0.     , 562.07465,   0.     ],
+              [  0.0,   0.     , 192.29662]])
+    
+    for i in range(eval_episodes):
+        # fig = plot_sol_qw2(fig, obs_history[i, :tf_max+2, :7].T, actions[i, :tf_max+1], range(np.shape(obs_history[i, :tf_max+2])[0]), None, c=color_list[i])
+        tf_i = int(tf[i])
+        qw = obs_history[i, :tf_i, :7].T
+        a  = actions[i, :tf_i-1]
+        t  = range(np.shape(obs_history[i, :tf_i])[0])
+        fig = plot_sol_qw(fig, qw, a, t, J, c=color_list[i])
+    
+    # print(episodic_returns)
     print("done")
     plt.tight_layout()
     plt.show()
