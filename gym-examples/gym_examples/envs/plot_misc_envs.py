@@ -154,7 +154,7 @@ def plot_sol_qw(sol, t, J):
             # plt.plot(t, qw_cvx[j,:], ':g.', label='cvx.')
             # plt.plot(t, qw_nl[j,:],  'b', label='nonlin.')
             
-            if j == 0: plt.legend()
+            # if j == 0: plt.legend()
             
         elif j == 7:
             plt.plot(t, np.sqrt(qw[:,0]**2 + qw[:,1]**2 + qw[:,2]**2 + qw[:,3]**2), 'b', label='|q|')

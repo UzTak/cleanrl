@@ -67,34 +67,16 @@ def evaluate_dummy(
     
     episodic_returns = []
     
-    obs_history = np.zeros((eval_episodes, 20, 10))   
+    obs_history = np.zeros((eval_episodes, envs.envs[0].env.num_burn_max, 10))   
     
     for i in range(eval_episodes):
         
         obs, _ = envs.reset()
-        
-        # def reset(seed=None, options=None):
-        #     w_max = 1
-        #     # Set the seed if provided
-        #     if seed is not None:
-        #         np.random.seed(seed)
-        #     # Reset environment state
-        #     q_res = np.random.rand(4)
-        #     q_res = q_res/np.linalg.norm(q_res)
-        #     w_res = np.random.rand(3)*w_max
-        #     state = np.concatenate((q_res, w_res, np.array([0, 10.0, 0])))
-        #     return state, {}
-        # obs, _ = reset()
-
         obs_history[i, 0] = obs
-        
-        # check the rms
-        print(envs.obs_rms.mean)
-        print(envs.obs_rms.var)
         
         r = 0 
         j = 0    # index 
-        while True:
+        for j in range(envs.envs[0].env.num_burn_max):
             actions, = torch.tensor([[1.0]])
             next_obs, reward, terminated, _, infos = envs.step(actions.cpu().numpy())
             # if "final_info" in infos:
@@ -105,14 +87,12 @@ def evaluate_dummy(
             #         episodic_returns += [info["episode"]["r"]]
             r += reward.item() 
             obs = next_obs
-            
             obs_history[i, j] = obs
-            
             if terminated:
                 break
             
-            j += 1
-            
+            # j += 1
+        
         episodic_returns.append(r)
 
     return episodic_returns, obs_history

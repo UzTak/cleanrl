@@ -45,9 +45,9 @@ class Args:
     # env_id: str = "HalfCheetah-v4"
     env_id: str = "gym_examples/RPO_Detumble2DEnv-v0"
     """the id of the environment"""
-    total_timesteps: int = 1000000
+    total_timesteps: int = 10000
     """total timesteps of the experiments"""
-    learning_rate: float = 3e-4
+    learning_rate: float = 5e-4
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
@@ -89,17 +89,8 @@ class Args:
 
 def make_env(env_id, idx, capture_video, run_name, gamma):
     def thunk():
-        if capture_video and idx == 0:
-            # env = gym.make(env_id, render_mode="rgb_array")
-            env = gym.make('gym_examples/RPO_Detumble3DEnv-v0')  #, render_mode="rgb_array")
-            # env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        else:
-            # env = gym.make(env_id)
-            # env = gym.make('gym_examples/RPO_Detumble2DEnv-v0')
-            env = gym.make('gym_examples/RPO_Detumble3DEnv-v0')
-            
+        env = gym.make('gym_examples/RPO_Detumble3DEnv-v0')         
         return env
-
     return thunk
 
 
