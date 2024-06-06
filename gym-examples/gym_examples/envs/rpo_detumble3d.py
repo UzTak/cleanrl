@@ -46,11 +46,11 @@ class RPO_Detumble3DEnv(gym.Env):
             self.r = 1  # radius of the target 
             alpha = 0.7
             
-            self.n_orbit = 100 # d_orbit
+            self.n_orbit = 100  # d_orbit
             self.w_max = 0.5
             self.num_burn_max = 50
             self.K_max = 3.0
-            self.freq_thrust = 10 # time steps between thrusts
+            self.freq_thrust = 10   # time steps between thrusts
             self.urem_max = alpha*self.K_max*self.num_burn_max
             self.t_max    = self.num_burn_max*self.freq_thrust
             
@@ -116,7 +116,7 @@ class RPO_Detumble3DEnv(gym.Env):
         h_I       = self.J_targ @ w_RSO_I
         
         T_I       = self.a2t_laser_3D(action, h_I, self.d)
-        dw_RSO_I  = T_I#la.inv(self.J_targ)@T_I
+        dw_RSO_I  = T_I  #la.inv(self.J_targ)@T_I
         w_RSO_I   = w_RSO_I + dw_RSO_I
         qw_RSO_I  = np.hstack((q_RSO_I, w_RSO_I))
 
